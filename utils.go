@@ -51,6 +51,7 @@ func downloadFromUrl(url string) (string, error) {
 
 	// creates the path
 	os.MkdirAll(FilePath, 0777)
+	defer os.Remove(FilePath)
 
 	// creates the file in the path folder
 	output, err := os.Create(fileName)
