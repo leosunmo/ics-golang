@@ -14,8 +14,6 @@ import (
 
 func init() {
 	mutex = new(sync.Mutex)
-	DeleteTempFiles = true
-	FilePath = "tmp/"
 	RepeatRuleApply = false
 	MaxRepeats = 10
 }
