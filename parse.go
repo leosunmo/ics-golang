@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,8 +13,6 @@ import (
 
 func init() {
 	mutex = new(sync.Mutex)
-	DeleteTempFiles = true
-	FilePath = "tmp/"
 	RepeatRuleApply = false
 	MaxRepeats = 10
 }
@@ -149,11 +146,13 @@ func (p *Parser) getICal(url string) (string, error) {
 	re, _ := regexp.Compile(`http(s){0,1}:\/\/`)
 
 	var fileName string
+	var fileContent []byte
 	var errDownload error
+	var errReadFile error
 
-	if re.FindString(url) != "" {
+	if re.FindString(url) != "" { // it's a remote iCal. Download and store as []byte
 		// download the file and store it local
-		fileName, errDownload = downloadFromUrl(url)
+		fileContent, errDownload = downloadFromUrl(url)
 
 		if errDownload != nil {
 			return "", errDownload
@@ -168,17 +167,13 @@ func (p *Parser) getICal(url string) (string, error) {
 			err := fmt.Sprintf("File %s does not exists", url)
 			return "", errors.New(err)
 		}
-	}
 
-	//  read the file with the ical data
-	fileContent, errReadFile := ioutil.ReadFile(fileName)
+		//  read the file with the ical data
+		fileContent, errReadFile = ioutil.ReadFile(fileName)
 
-	if errReadFile != nil {
-		return "", errReadFile
-	}
-
-	if DeleteTempFiles && re.FindString(url) != "" {
-		os.Remove(fileName)
+		if errReadFile != nil {
+			return "", errReadFile
+		}
 	}
 
 	return fmt.Sprintf("%s", fileContent), nil
