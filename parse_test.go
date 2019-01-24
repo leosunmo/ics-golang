@@ -3,13 +3,12 @@ package ics
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func TestLoadCalendar(t *testing.T) {
+func TestLoadLocalCalendar(t *testing.T) {
 	parser := New()
 	calBytes, err := ioutil.ReadFile("testCalendars/2eventsCal.ics")
 	if err != nil {
@@ -17,6 +16,29 @@ func TestLoadCalendar(t *testing.T) {
 	}
 
 	parser.Load(string(calBytes))
+
+	parseErrors, err := parser.GetErrors()
+	if err != nil {
+		t.Errorf("Failed to wait the parse of the calendars ( %s )", err)
+	}
+	for i, pErr := range parseErrors {
+		t.Errorf("Parsing Error №%d: %s", i, pErr)
+	}
+
+	calendars, errCal := parser.GetCalendars()
+	if errCal != nil {
+		t.Errorf("Failed to get calendars ( %s )", errCal)
+	}
+	if len(calendars) != 1 {
+		t.Errorf("Expected 1 calendar, found %d calendars", len(calendars))
+	}
+}
+
+func TestLoadHTTPCalendar(t *testing.T) {
+	parser := New()
+	inputChan := parser.GetInputChan()
+	inputChan <- "http://apps.employment.govt.nz/ical/public-holidays-all.ics"
+	parser.Wait()
 
 	parseErrors, err := parser.GetErrors()
 	if err != nil {
@@ -74,7 +96,7 @@ func TestParsing0Calendars(t *testing.T) {
 	}
 }
 
-func TestParsing1Calendars(t *testing.T) {
+func TestParsing1LocalCalendars(t *testing.T) {
 	parser := New()
 	input := parser.GetInputChan()
 	input <- "testCalendars/2eventsCal.ics"
@@ -101,7 +123,7 @@ func TestParsing1Calendars(t *testing.T) {
 
 }
 
-func TestParsing2Calendars(t *testing.T) {
+func TestParsing2LocalCalendars(t *testing.T) {
 	parser := New()
 	input := parser.GetInputChan()
 	input <- "testCalendars/2eventsCal.ics"
@@ -124,9 +146,117 @@ func TestParsing2Calendars(t *testing.T) {
 	}
 
 	if len(calendars) != 2 {
-		t.Errorf("Expected 1 calendar, found %d calendars", len(calendars))
+		t.Errorf("Expected 2 calendars, found %d calendars", len(calendars))
 	}
 
+}
+
+func TestParsing1OnlineCalendars(t *testing.T) {
+	parser := New()
+	input := parser.GetInputChan()
+	input <- "http://apps.employment.govt.nz/ical/public-holidays-all.ics"
+	parser.Wait()
+
+	parseErrors, err := parser.GetErrors()
+
+	if err != nil {
+		t.Errorf("Failed to wait the parse of the calendars ( %s )", err)
+	}
+	for i, pErr := range parseErrors {
+		t.Errorf("Parsing Error №%d: %s", i, pErr)
+	}
+
+	calendars, errCal := parser.GetCalendars()
+
+	if errCal != nil {
+		t.Errorf("Failed to get calendars ( %s )", errCal)
+	}
+
+	if len(calendars) != 1 {
+		t.Errorf("Expected 1 calendar, found %d calendars", len(calendars))
+	}
+}
+
+func TestParsing2OnlineCalendars(t *testing.T) {
+	parser := New()
+	input := parser.GetInputChan()
+	input <- "http://apps.employment.govt.nz/ical/public-holidays-all.ics"
+	input <- "http://www.google.com/calendar/ical/bg.bulgarian%23holiday%40group.v.calendar.google.com/public/basic.ics"
+	parser.Wait()
+
+	parseErrors, err := parser.GetErrors()
+
+	if err != nil {
+		t.Errorf("Failed to wait the parse of the calendars ( %s )", err)
+	}
+	for i, pErr := range parseErrors {
+		t.Errorf("Parsing Error №%d: %s", i, pErr)
+	}
+
+	calendars, errCal := parser.GetCalendars()
+
+	if errCal != nil {
+		t.Errorf("Failed to get calendars ( %s )", errCal)
+	}
+
+	if len(calendars) != 2 {
+		t.Errorf("Expected 2 calendars, found %d calendars", len(calendars))
+	}
+}
+
+func TestParsing2MixedCalendars(t *testing.T) {
+	parser := New()
+	input := parser.GetInputChan()
+	input <- "http://apps.employment.govt.nz/ical/public-holidays-all.ics"
+	input <- "testCalendars/3eventsNoAttendee.ics"
+	parser.Wait()
+
+	parseErrors, err := parser.GetErrors()
+
+	if err != nil {
+		t.Errorf("Failed to wait the parse of the calendars ( %s )", err)
+	}
+	for i, pErr := range parseErrors {
+		t.Errorf("Parsing Error №%d: %s", i, pErr)
+	}
+
+	calendars, errCal := parser.GetCalendars()
+
+	if errCal != nil {
+		t.Errorf("Failed to get calendars ( %s )", errCal)
+	}
+
+	if len(calendars) != 2 {
+		t.Errorf("Expected 2 calendars, found %d calendars", len(calendars))
+	}
+}
+
+func TestParsing1Broken2MixedCalendars(t *testing.T) {
+	parser := New()
+	input := parser.GetInputChan()
+	input <- "http://apps.employment.govt.nz/ical/public-holidays-all.ics"
+	input <- "NotARealCalendar.ics"
+	input <- "testCalendars/3eventsNoAttendee.ics"
+	parser.Wait()
+
+	parseErrors, err := parser.GetErrors()
+
+	if err != nil {
+		t.Errorf("Failed to wait the parse of the calendars ( %s )", err)
+	}
+	if len(parseErrors) != 1 {
+		t.Errorf("Expected 1 error, found %d in :\n  %#v", len(parseErrors), parseErrors)
+	}
+
+	calendars, errCal := parser.GetCalendars()
+
+	if errCal != nil {
+		t.Errorf("Failed to get calendars ( %s )", errCal)
+	}
+
+	if len(calendars) != 2 {
+		t.Errorf("Expected 2 calendars, found %d calendars", len(calendars))
+	}
 }
 
 func TestParsingNotExistingCalendar(t *testing.T) {
@@ -197,22 +327,6 @@ func TestParsingWrongCalendarUrls(t *testing.T) {
 	if len(calendars) != 0 {
 		t.Errorf("Expected 0 calendar, found %d calendars", len(calendars))
 	}
-}
-
-func TestCreatingTempDir(t *testing.T) {
-	FilePath = "testingTempDir/"
-	parser := New()
-	input := parser.GetInputChan()
-	input <- "https://www.google.com/calendar/ical/yordanpulov%40gmail.com/private-81525ac0eb14cdc2e858c15e1b296a1c/basic.ics"
-	parser.Wait()
-	_, err := os.Stat(FilePath)
-	if err != nil {
-		t.Errorf("Failed to create %s", FilePath)
-	}
-	// remove the new dir
-	os.Remove(FilePath)
-	// return the var to default
-	FilePath = "tmp/"
 }
 
 func TestCalendarInfo(t *testing.T) {
