@@ -25,6 +25,7 @@ type Parser struct {
 	parsedCalendars []*Calendar
 	parsedEvents    []*Event
 	statusCalendars int
+	defaultTimezone *time.Location
 	wg              *sync.WaitGroup
 }
 
@@ -38,6 +39,7 @@ func New() *Parser {
 	p.wg = new(sync.WaitGroup)
 	p.parsedCalendars = []*Calendar{}
 	p.parsedEvents = []*Event{}
+	p.defaultTimezone = time.UTC
 
 	// buffers the events output chan
 	go func() {
@@ -121,6 +123,11 @@ func (p *Parser) GetCalendars() ([]*Calendar, error) {
 		return nil, errors.New("Calendars not parsed")
 	}
 	return p.parsedCalendars, nil
+}
+
+// Set default timezone if none set in calendar
+func (p *Parser) DefaultTimezone(timezone *time.Location) {
+	p.defaultTimezone = timezone
 }
 
 // returns the array with the errors occurred while parsing the events
@@ -266,7 +273,7 @@ func (p *Parser) parseEvents(cal *Calendar, eventsData []string) {
 		event.SetStatus(p.parseEventStatus(eventData))
 		event.SetSummary(p.parseEventSummary(eventData))
 		event.SetDescription(p.parseEventDescription(eventData))
-		event.SetImportedID(p.parseEventId(eventData))
+		event.SetImportedID(p.parseEventID(eventData))
 		event.SetClass(p.parseEventClass(eventData))
 		event.SetSequence(p.parseEventSequence(eventData))
 		event.SetCreated(p.parseEventCreated(eventData))
@@ -295,7 +302,7 @@ func (p *Parser) parseEvents(cal *Calendar, eventsData []string) {
 			if untilString == "" {
 				until = nil
 			} else {
-				untilV, _ := time.Parse(IcsFormat, untilString)
+				untilV, _ := time.ParseInLocation(IcsFormat, untilString, p.defaultTimezone)
 				until = &untilV
 			}
 
@@ -446,7 +453,7 @@ func (p *Parser) parseEventDescription(eventData string) string {
 }
 
 // parses the event id provided form google
-func (p *Parser) parseEventId(eventData string) string {
+func (p *Parser) parseEventID(eventData string) string {
 	re, _ := regexp.Compile(`UID:.*?\n`)
 	result := re.FindString(eventData)
 	return trimField(result, "UID:")
@@ -472,7 +479,7 @@ func (p *Parser) parseEventCreated(eventData string) time.Time {
 	re, _ := regexp.Compile(`CREATED:.*?\n`)
 	result := re.FindString(eventData)
 	created := trimField(result, "CREATED:")
-	t, _ := time.Parse(IcsFormat, created)
+	t, _ := time.ParseInLocation(IcsFormat, created, p.defaultTimezone)
 	return t
 }
 
@@ -481,7 +488,7 @@ func (p *Parser) parseEventModified(eventData string) time.Time {
 	re, _ := regexp.Compile(`LAST-MODIFIED:.*?\n`)
 	result := re.FindString(eventData)
 	modified := trimField(result, "LAST-MODIFIED:")
-	t, _ := time.Parse(IcsFormat, modified)
+	t, _ := time.ParseInLocation(IcsFormat, modified, p.defaultTimezone)
 	return t
 }
 
@@ -495,7 +502,7 @@ func (p *Parser) parseEventStart(eventData string) time.Time {
 	if resultWholeDay != "" {
 		// whole day event
 		modified := trimField(resultWholeDay, "DTSTART;VALUE=DATE:")
-		t, _ = time.Parse(IcsFormatWholeDay, modified)
+		t, _ = time.ParseInLocation(IcsFormatWholeDay, modified, p.defaultTimezone)
 	} else {
 		// event that has start hour and minute
 		result := re.FindString(eventData)
@@ -505,7 +512,7 @@ func (p *Parser) parseEventStart(eventData string) time.Time {
 			modified = fmt.Sprintf("%sZ", modified)
 		}
 
-		t, _ = time.Parse(IcsFormat, modified)
+		t, _ = time.ParseInLocation(IcsFormat, modified, p.defaultTimezone)
 	}
 
 	return t
@@ -521,7 +528,7 @@ func (p *Parser) parseEventEnd(eventData string) time.Time {
 	if resultWholeDay != "" {
 		// whole day event
 		modified := trimField(resultWholeDay, "DTEND;VALUE=DATE:")
-		t, _ = time.Parse(IcsFormatWholeDay, modified)
+		t, _ = time.ParseInLocation(IcsFormatWholeDay, modified, p.defaultTimezone)
 	} else {
 		// event that has end hour and minute
 		result := re.FindString(eventData)
@@ -530,7 +537,7 @@ func (p *Parser) parseEventEnd(eventData string) time.Time {
 		if !strings.Contains(modified, "Z") {
 			modified = fmt.Sprintf("%sZ", modified)
 		}
-		t, _ = time.Parse(IcsFormat, modified)
+		t, _ = time.ParseInLocation(IcsFormat, modified, p.defaultTimezone)
 	}
 	return t
 

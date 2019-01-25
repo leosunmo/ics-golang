@@ -144,15 +144,15 @@ func (c *Calendar) GetEventsByDates() map[string][]*Event {
 	return c.eventsByDate
 }
 
-// get all events for specified date
-func (c *Calendar) GetEventsByDate(dateTime time.Time) ([]*Event, error) {
+// get all events for specified date. false if no event is found
+func (c *Calendar) GetEventsByDate(dateTime time.Time) ([]*Event, bool) {
 	tz := c.GetTimezone()
 	day := time.Date(dateTime.Year(), dateTime.Month(), dateTime.Day(), 0, 0, 0, 0, &tz)
 	events, ok := c.eventsByDate[day.Format(YmdHis)]
 	if ok {
-		return events, nil
+		return events, true
 	}
-	return nil, errors.New(fmt.Sprintf("There are no events for the day %s", day.Format(YmdHis)))
+	return nil, false
 }
 
 // GetUpcomingEvents returns the next n-Events.
