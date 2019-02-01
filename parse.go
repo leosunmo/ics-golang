@@ -18,15 +18,16 @@ func init() {
 }
 
 type Parser struct {
-	inputChan       chan string
-	outputChan      chan *Event
-	bufferedChan    chan *Event
-	errorsOccured   []error
-	parsedCalendars []*Calendar
-	parsedEvents    []*Event
-	statusCalendars int
-	defaultTimezone *time.Location
-	wg              *sync.WaitGroup
+	inputChan                 chan string
+	outputChan                chan *Event
+	bufferedChan              chan *Event
+	errorsOccured             []error
+	parsedCalendars           []*Calendar
+	parsedEvents              []*Event
+	statusCalendars           int
+	defaultTimezone           *time.Location
+	wholeDayEndBeforeMidnight bool
+	wg                        *sync.WaitGroup
 }
 
 // creates new parser
@@ -40,6 +41,7 @@ func New() *Parser {
 	p.parsedCalendars = []*Calendar{}
 	p.parsedEvents = []*Event{}
 	p.defaultTimezone = time.UTC
+	p.wholeDayEndBeforeMidnight = false
 
 	// buffers the events output chan
 	go func() {
@@ -128,6 +130,11 @@ func (p *Parser) GetCalendars() ([]*Calendar, error) {
 // Set default timezone if none set in calendar
 func (p *Parser) DefaultTimezone(timezone *time.Location) {
 	p.defaultTimezone = timezone
+}
+
+// WholeDayEndsBeforeMidnight will cause "whole day" events to end 1 second before midnight
+func (p *Parser) WholeDayEndsBeforeMidnight(b bool) {
+	p.wholeDayEndBeforeMidnight = b
 }
 
 // returns the array with the errors occurred while parsing the events
@@ -529,6 +536,9 @@ func (p *Parser) parseEventEnd(eventData string) time.Time {
 		// whole day event
 		modified := trimField(resultWholeDay, "DTEND;VALUE=DATE:")
 		t, _ = time.ParseInLocation(IcsFormatWholeDay, modified, p.defaultTimezone)
+		if p.wholeDayEndBeforeMidnight {
+			t = t.Add(-1 * time.Second)
+		}
 	} else {
 		// event that has end hour and minute
 		result := re.FindString(eventData)
